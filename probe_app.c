@@ -4,6 +4,11 @@
 #include <Protocol/SimpleFileSystem.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Guid/FileInfo.h>
+#include <Guid/GlobalVariable.h>
+#include <Protocol/DriverBinding.h>
+#ifdef PROBE_HANDOFF_TEST
+#include "discrete_handoff.h"
+#endif
 
 static EFI_GUID PciGuid = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID LoadedGuid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -12,11 +17,15 @@ static EFI_GUID FsGuid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 static EFI_GUID GopGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID FileInfoGuid = EFI_FILE_INFO_ID;
 static EFI_SYSTEM_TABLE *St;
-static CHAR8 Log[32768];
+/* Keep an absolute pointer relocation for firmware PE loaders. */
+static EFI_SYSTEM_TABLE **volatile SystemTableSlot = &St;
+static CHAR8 Log[262144];
 static UINTN Used;
+static BOOLEAN LogOverflow;
 
 static VOID Text(const CHAR8 *S) {
   while (*S && Used + 1 < sizeof(Log)) Log[Used++] = *S++;
+  if (*S) LogOverflow = TRUE;
   Log[Used] = 0;
 }
 static VOID Hex(const CHAR8 *Key, UINT64 Value) {
@@ -141,6 +150,95 @@ static EFI_STATUS Save(EFI_FILE_PROTOCOL *Directory, CHAR16 *Name,
   return Status;
 }
 
+static VOID GuidText(const EFI_GUID *Guid) {
+  static const CHAR8 Digits[] = "0123456789abcdef";
+  const UINT8 *Bytes = (const UINT8 *)Guid;
+  Text("protocol_guid_bytes=");
+  for (UINTN I = 0; I < sizeof(*Guid); I++) {
+    CHAR8 Pair[] = {Digits[Bytes[I] >> 4], Digits[Bytes[I] & 15], 0}; Text(Pair);
+  }
+  Text("\r\n");
+}
+
+/* Information queries only. Never OpenProtocol(EXCLUSIVE) or disconnect here. */
+static VOID RecordOwnership(EFI_HANDLE Handle) {
+  EFI_BOOT_SERVICES *Bs = St->BootServices;
+  EFI_GUID **Protocols = NULL; UINTN Count = 0, Total = 0;
+  Text("[OWNERSHIP]\r\n"); Hex("controller_handle", (UINTN)Handle);
+  if (!Bs->ProtocolsPerHandle || !Bs->OpenProtocolInformation) {
+    Text("ownership=information services unavailable\r\n"); return;
+  }
+  EFI_STATUS Status = Bs->ProtocolsPerHandle(Handle, &Protocols, &Count);
+  Hex("protocols_status", Status); Hex("protocol_count", Count);
+  if (!EFI_ERROR(Status) && Protocols && Count <= 64) {
+    for (UINTN I = 0; I < Count; I++) {
+      EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *Entries = NULL; UINTN N = 0;
+      if (!Protocols[I]) { Text("ownership=null protocol\r\n"); break; }
+      GuidText(Protocols[I]);
+      Status = Bs->OpenProtocolInformation(Handle, Protocols[I], &Entries, &N);
+      Hex("open_information_status", Status); Hex("open_entry_count", N);
+      if (!EFI_ERROR(Status) && (!N || Entries) && N <= 128 - Total) {
+        Total += N;
+        for (UINTN J = 0; J < N; J++) {
+          EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *Entry = &Entries[J];
+          Hex("agent_handle", (UINTN)Entry->AgentHandle);
+          Hex("child_controller_handle", (UINTN)Entry->ControllerHandle);
+          Hex("open_attributes", Entry->Attributes); Hex("open_count", Entry->OpenCount);
+          if (Entry->Attributes & EFI_OPEN_PROTOCOL_BY_DRIVER) {
+            EFI_DRIVER_BINDING_PROTOCOL *Binding = NULL;
+            EFI_GUID BindingGuid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
+            Status = Bs->HandleProtocol(Entry->AgentHandle, &BindingGuid, (VOID **)&Binding);
+            Hex("binding_status", Status);
+            if (!EFI_ERROR(Status) && Binding) {
+              Hex("binding_handle", (UINTN)Binding->DriverBindingHandle);
+              Hex("driver_image_handle", (UINTN)Binding->ImageHandle);
+              Hex("binding_version", Binding->Version);
+              EFI_LOADED_IMAGE_PROTOCOL *Loaded = NULL;
+              Status = Bs->HandleProtocol(Binding->ImageHandle, &LoadedGuid, (VOID **)&Loaded);
+              Hex("driver_loaded_image_status", Status);
+              if (!EFI_ERROR(Status) && Loaded) {
+                Hex("driver_image_bytes", Loaded->ImageSize);
+                Hex("driver_code_type", Loaded->ImageCodeType);
+              }
+            }
+          }
+        }
+      } else if (!EFI_ERROR(Status)) Text("ownership=invalid or oversized entries\r\n");
+      if (Entries) Bs->FreePool(Entries);
+      if (Total >= 128) { Text("ownership=entry limit reached\r\n"); break; }
+    }
+  }
+  if (Protocols) Bs->FreePool(Protocols);
+}
+
+/* Record exact boot option bytes without loading an image or changing NVRAM. */
+static VOID RecordBootOptions(VOID) {
+  EFI_GUID GlobalGuid = EFI_GLOBAL_VARIABLE;
+  UINT16 Order[64]; UINTN Bytes = sizeof(Order);
+  Text("[BOOT OPTIONS]\r\n");
+  if (!St->RuntimeServices || !St->RuntimeServices->GetVariable) {
+    Text("boot_options=runtime query unavailable\r\n"); return;
+  }
+  EFI_STATUS Status = St->RuntimeServices->GetVariable(L"BootOrder", &GlobalGuid, NULL, &Bytes, Order);
+  Hex("boot_order_status", Status);
+  if (EFI_ERROR(Status) || Bytes > sizeof(Order) || (Bytes & 1)) return;
+  static const CHAR16 HexDigits[] = L"0123456789ABCDEF";
+  static const CHAR8 Digits[] = "0123456789abcdef";
+  static UINT8 Data[4096];
+  for (UINTN I = 0; I < Bytes / 2; I++) {
+    CHAR16 Name[] = L"Boot0000"; UINTN Size = sizeof(Data);
+    for (UINTN J = 0; J < 4; J++) Name[4+J] = HexDigits[(Order[I] >> ((3-J)*4)) & 15];
+    Status = St->RuntimeServices->GetVariable(Name, &GlobalGuid, NULL, &Size, Data);
+    Hex("boot_option", Order[I]); Hex("boot_option_status", Status);
+    if (EFI_ERROR(Status) || Size > sizeof(Data)) continue;
+    Text("boot_option_bytes=");
+    for (UINTN J = 0; J < Size; J++) {
+      CHAR8 Pair[] = {Digits[Data[J] >> 4], Digits[Data[J] & 15], 0}; Text(Pair);
+    }
+    Text("\r\n");
+  }
+}
+
 static VOID RecordGop(VOID) {
   EFI_HANDLE *Handles = NULL;
   UINTN Count = 0, I;
@@ -153,6 +251,7 @@ static VOID RecordGop(VOID) {
     Status = St->BootServices->HandleProtocol(Handles[I], &GopGuid, (VOID **)&Gop);
     if (EFI_ERROR(Status) || !Gop || !Gop->Mode) continue;
     Text("[GOP]\r\n"); Hex("index", I);
+    Hex("gop_handle", (UINTN)Handles[I]);
     Hex("mode", Gop->Mode->Mode);
     Hex("framebuffer_base", Gop->Mode->FrameBufferBase);
     Hex("framebuffer_size", Gop->Mode->FrameBufferSize);
@@ -163,9 +262,65 @@ static VOID RecordGop(VOID) {
       Hex("pixel_format", Gop->Mode->Info->PixelFormat);
     }
     PathHasUsb(Handles[I], TRUE);
+    RecordOwnership(Handles[I]);
   }
   if (Handles) St->BootServices->FreePool(Handles);
 }
+
+#ifdef PROBE_HANDOFF_TEST
+static EFI_FILE_PROTOCOL *HandoffFile;
+static BOOLEAN HandoffLogFailed;
+static BOOLEAN HandoffLog(const char *Event, EFI_STATUS Status, UINT64 Value) {
+  UINTN Previous=Used;
+  Text(Event);Text("\r\n");Hex("status",Status);Hex("value",Value);
+  if(!HandoffFile || HandoffLogFailed || LogOverflow)return FALSE;
+  UINTN Expected=Used-Previous,Written=Expected;
+  EFI_STATUS S=HandoffFile->Write(HandoffFile,&Written,Log+Previous);
+  if(!EFI_ERROR(S) && Written==Expected)S=HandoffFile->Flush(HandoffFile);
+  if(EFI_ERROR(S) || Written!=Expected)HandoffLogFailed=TRUE;
+  return !HandoffLogFailed;
+}
+static VOID RunHandoff(EFI_HANDLE Image,EFI_HANDLE Target,EFI_FILE_PROTOCOL *Output) {
+  EFI_STATUS Status;EFI_FILE_PROTOCOL *Existing=NULL;
+  Status=Output->Open(Output,&Existing,L"HANDOFF.TXT",EFI_FILE_MODE_READ,0);
+  if(!EFI_ERROR(Status)){if(Existing)Existing->Close(Existing);return;}
+  if(Status!=EFI_NOT_FOUND)return;
+  HandoffFile=NULL;HandoffLogFailed=FALSE;Used=0;Log[0]=0;LogOverflow=FALSE;
+  Status=Output->Open(Output,&HandoffFile,L"HANDOFF.TXT",
+    EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
+  if(EFI_ERROR(Status) || !HandoffFile)return;
+  if(!HandoffLog("handoff-test-build-v0.3",EFI_SUCCESS,0)) {
+    HandoffFile->Close(HandoffFile);HandoffFile=NULL;return;
+  }
+  DH_PLAN Plan;
+  Status=DhPlan(St,Target,Image,&Plan,HandoffLog);
+  if(EFI_ERROR(Status)) {
+    HandoffLog("handoff-preflight-refused",Status,0);
+    Say(L"Handoff preflight refused. Details saved in HANDOFF.TXT. No driver stopped.\r\n");
+    HandoffFile->Close(HandoffFile);HandoffFile=NULL;return;
+  }
+  Say(L"\r\nOPTIONAL DISCRETE DISPLAY HANDOFF TEST - not an unlock\r\n");
+  Say(L"T stops then reconnects the NVIDIA UEFI driver once. The screen may go black.\r\n");
+  Say(L"If the screen stays black for over 60 seconds, power off with the power button.\r\n");
+  Say(L"Press T to test, Esc to cancel; after 30 seconds this test cancels.\r\n");
+  BOOLEAN Armed=DhConfirmTest(St);
+  DH_RESULT Result={0};
+  if(Armed && HandoffLog("manual-T",EFI_SUCCESS,1)) {
+    Status=St->BootServices->SetWatchdogTimer(0,0,0,NULL);
+    if(HandoffLog("watchdog-disable",Status,0) && !EFI_ERROR(Status)) {
+      /* No console calls from DhRun or its log callback while GOPs are detached. */
+      Status=DhRun(St,&Plan,&Result,HandoffLog);
+      HandoffLog("handoff-final",Status,Result.DisplayRestored);
+    }
+  } else HandoffLog("handoff-cancelled",EFI_ABORTED,0);
+  HandoffFile->Close(HandoffFile);HandoffFile=NULL;
+  if(Result.Attempted && !Result.DisplayRestored) {
+    /* Do not hand a broken graphics environment to Windows. No reset loop. */
+    for(;;)St->BootServices->Stall(1000000);
+  }
+  if(DhConsoleReady(St))Say(L"Handoff test finished. HANDOFF.TXT is saved. The GPU was not unlocked.\r\n");
+}
+#endif
 
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image, EFI_SYSTEM_TABLE *Table) {
   EFI_BOOT_SERVICES *Bs;
@@ -175,11 +330,23 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image, EFI_SYSTEM_TABLE *Table) {
   UINTN Count = 0, I, Matches = 0;
   EFI_STATUS Status;
   PROBE_RESULT Result;
-  St = Table; Bs = St->BootServices; Used = 0; Log[0] = 0;
-  Say(L"\r\nRTX 3080 read-only diagnostic v0.1\r\n");
+  *SystemTableSlot = Table; Bs = St->BootServices; Used = 0; Log[0] = 0; LogOverflow = FALSE;
+#ifdef PROBE_HANDOFF_TEST
+  Say(L"\r\nRTX 3080 diagnostic v0.3 - optional Discrete driver handoff test\r\n");
+#else
+  Say(L"\r\nRTX 3080 read-only diagnostic v0.2 - Discrete ownership\r\n");
+#endif
   Say(L"Collects BIOS and preboot state. This does not unlock the GPU.\r\n");
-  Text("RTX3080 read-only diagnostic v0.1\r\n");
-  Text("Expected PCI 10de:2206 subsystem 1462:3890\r\n");
+#ifdef PROBE_HANDOFF_TEST
+  Text("RTX3080 diagnostic v0.3 - optional Discrete driver handoff test\r\n");
+  Text("REPORT.TXT covers the read-only phase; driver test results are in HANDOFF.TXT\r\n");
+#else
+  Text("RTX3080 read-only diagnostic v0.2 - Discrete ownership\r\n");
+#endif
+  Text(PROBE_ID_TEXT);
+  Hex("console_out_handle", (UINTN)St->ConsoleOutHandle);
+  Hex("console_in_handle", (UINTN)St->ConsoleInHandle);
+  Hex("standard_error_handle", (UINTN)St->StandardErrorHandle);
   Output = OpenOutput(Image);
   Status = Bs->LocateHandleBuffer(ByProtocol, &PciGuid, NULL, &Count, &Handles);
   Hex("pci_enumeration_status", Status);
@@ -204,9 +371,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image, EFI_SYSTEM_TABLE *Table) {
   if (Handles) Bs->FreePool(Handles);
   Hex("matching_cards", Matches);
   RecordGop();
+  RecordBootOptions();
   if (Matches == 1) {
-    Say(L"Expected MSI RTX 3080 found. Reading its existing state...\r\n");
+    Say(PROBE_FOUND_TEXT);
     Text("[TARGET]\r\n"); PathHasUsb(SelectedHandle, TRUE);
+    RecordOwnership(SelectedHandle);
     Status = ProbeCollect(Selected, Bs, &Result);
     Hex("collect_status", Status);
     if (!EFI_ERROR(Status)) {
@@ -247,12 +416,21 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image, EFI_SYSTEM_TABLE *Table) {
     Say(L"Expected card missing or ambiguous. No GPU MMIO reads attempted.\r\n");
   }
   Text("GPU writes=none; GPU resets=none; boot-variable changes=none\r\n");
+  if (LogOverflow) {
+    static const CHAR8 Tail[] = "\r\nREPORT_TRUNCATED=1; additional ownership or boot data missing\r\n";
+    UINTN N = sizeof(Tail)-1;
+    if (Used >= N) for (UINTN J = 0; J < N; J++) Log[Used-N+J] = Tail[J];
+    Say(L"WARNING: log buffer full; report is incomplete.\r\n");
+  }
   Status = Save(Output, L"REPORT.TXT", Log, Used);
-  if (Output) Output->Close(Output);
   if (EFI_ERROR(Status)) {
     Say(L"Could not save report. Diagnostic details follow:\r\n");
     Hex("report_save_status", Status); ShowLog();
   } else Say(L"Saved: USB \\RTX3080-PROBE\\RUNxx\\REPORT.TXT and available BIOS copies.\r\n");
+#ifdef PROBE_HANDOFF_TEST
+  if(!EFI_ERROR(Status) && Matches==1 && !LogOverflow && Output)RunHandoff(Image,SelectedHandle,Output);
+#endif
+  if (Output) Output->Close(Output);
   Say(L"Returning in 15 seconds. Choose Windows Boot Manager if a boot menu appears.\r\n");
   Bs->Stall(15000000);
   return EFI_SUCCESS;

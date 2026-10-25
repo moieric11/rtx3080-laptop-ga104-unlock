@@ -1,0 +1,38 @@
+{
+  "utc": "2026-10-23T20:15:49.928478+00:00",
+  "executable_sha256": "c24d7f5022e2b7337de90f6d0f6c46d4b849e959857180db09e153eb91f83661",
+  "gpu_before": "name, pci.device_id, vbios_version, driver_version, power.draw [W], temperature.gpu, clocks.current.sm [MHz], utilization.gpu [%]\nNVIDIA GeForce RTX 3080 Laptop GPU, 0x24DC10DE, 94.04.3f.00.c5, 617.14, 16.10 W, 52, 210 MHz, 36 %\n",
+  "gpu_after": "name, pci.device_id, vbios_version, driver_version, power.draw [W], temperature.gpu, clocks.current.sm [MHz], utilization.gpu [%]\nNVIDIA GeForce RTX 3080 Laptop GPU, 0x24DC10DE, 94.04.3f.00.c5, 617.14, 109.44 W, 68, 1875 MHz, 40 %\n",
+  "results": [
+    {
+      "n": 2048,
+      "mode": "FP32acc",
+      "median_tflops": 38.50193
+    },
+    {
+      "n": 2048,
+      "mode": "FP16acc",
+      "median_tflops": 60.133391
+    },
+    {
+      "n": 4096,
+      "mode": "FP32acc",
+      "median_tflops": 40.396607
+    },
+    {
+      "n": 4096,
+      "mode": "FP16acc",
+      "median_tflops": 66.117104
+    },
+    {
+      "n": 8192,
+      "mode": "FP32acc",
+      "median_tflops": 42.261239
+    },
+    {
+      "n": 8192,
+      "mode": "FP16acc",
+      "median_tflops": 67.027171
+    }
+  ]
+}

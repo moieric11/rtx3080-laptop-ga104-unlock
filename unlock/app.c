@@ -122,7 +122,7 @@ static EFI_STATUS ConfigCheck(BOOLEAN Save) {
   status=ReadConfig(config);if(EFI_ERROR(status))return status;
   BOOLEAN checked=GuCheckConfig(config,segment,bus,device,function,&caps);
   BOOLEAN valid=checked && config[2]==0x030000a1 && config[0xc8/4]==0x00050011 &&
-    config[0x10/4]==0x84000000 && !(config[(caps.pcie+8)/4]&0x00200000U);
+    config[0x10/4]==GU_BOARD_BAR0 && !(config[(caps.pcie+8)/4]&0x00200000U);
   BOOLEAN same=Save || !memcmp(config,InitialConfig,sizeof(config));
   if(Save || !valid || !same)ConfigLog(config);
   GuLog("target BDF=%zu:%zu:%zu.%zu checks=%u pm=%#x pcie=%#x msi=%#x msix=%#x\n",
@@ -208,10 +208,10 @@ static EFI_STATUS BarCheck(VOID) {
         (unsigned)r->ResType,(unsigned long long)r->AddrSpaceGranularity,(unsigned long long)r->AddrRangeMin,
         (unsigned long long)r->AddrRangeMax,(unsigned long long)r->AddrLen,(unsigned long long)r->AddrTranslationOffset);
     if(!r || r->Desc!=ACPI_ADDRESS_SPACE_DESCRIPTOR || r->Len!=sizeof(*r)-3 || r->ResType!=0 ||
-      r->AddrRangeMin!=0x84000000 || r->AddrLen!=0x1000000 || r->AddrTranslationOffset ||
+      r->AddrRangeMin!=GU_BOARD_BAR0 || r->AddrLen!=0x1000000 || r->AddrTranslationOffset ||
       /* UEFI describes an inclusive end; pinned EDK2 PciBusDxe instead returns
          PciBar.Alignment. Both representations describe this exact 16 MiB BAR. */
-      (r->AddrRangeMax!=0x84ffffff && r->AddrRangeMax!=0x00ffffff) ||
+      (r->AddrRangeMax!=GU_BOARD_BAR0+0x00ffffff && r->AddrRangeMax!=0x00ffffff) ||
       r->AddrSpaceGranularity!=32 || ((UINT8 *)(r+1))[0]!=ACPI_END_TAG_DESCRIPTOR)status=EFI_UNSUPPORTED;
     else {
       UINT8 *raw=(UINT8 *)r,sum=0;
@@ -231,13 +231,13 @@ static EFI_STATUS ColdCheck(VOID) {
   GuLog("cold state: chip=%#x plm=%#x gfw=%#x/%#x/%#x WPR2_HI=%#x SS0=%#x SS1=%#x\n",
     GU_BOARD_CHIP,plm,s.plm,s.boot,s.cpuctl,hi,ss0,ss1);
   if(Gu.fault || gpu_unlock_gfw_assess(&s) || hi>>4 || plm!=0xffffff8f ||
-    ss0!=0x46254040 || (ss1!=2 && ss1!=3) || GuRead32(0x1183a4)!=0x2800)return EFI_NOT_READY;
+    ss0!=GU_BOARD_COLD_SS0 || !GU_BOARD_COLD_SS1_MATCH(ss1) || GuRead32(0x1183a4)!=GU_BOARD_FB_MB)return EFI_NOT_READY;
   return Gu.fault?EFI_DEVICE_ERROR:EFI_SUCCESS;
 }
 static EFI_STATUS PromCheck(VOID) {
   VOID *prom=GuAlloc(1048576);if(!prom)return EFI_OUT_OF_RESOURCES;
   GuCopyFromIo(prom,(VOID *)(UINTN)(Gu.bar_base+0x300000),1048576);
-  BOOLEAN good=!Gu.fault && GuHashMatches(prom,1048576,"f3dc8f07b0b8c9856d192df172dfa7f7f84ac17ef6edfdb448ad7fa94efd2789");
+  BOOLEAN good=!Gu.fault && GuHashMatches(prom,1048576,GU_BOARD_PROM_SHA256);
   GuFree(prom);GuLog("live PROM hash matched=%u\n",(unsigned)good);return good?EFI_SUCCESS:EFI_CRC_ERROR;
 }
 static EFI_STATUS Arm(VOID) {

@@ -1,0 +1,53 @@
+{
+  "gpu": "NVIDIA GeForce RTX 3080 Laptop GPU",
+  "runtime": 13040,
+  "driver_api": 13040,
+  "cublas": 130800,
+  "samples": 9,
+  "batch": 4,
+  "warmup_seconds": 1,
+  "results": [
+    {
+      "n": 2048,
+      "mode": "FP32acc",
+      "median_tflops": 58.203696,
+      "first": 2295.00708,
+      "last": 2295.00708
+    },
+    {
+      "n": 2048,
+      "mode": "FP16acc",
+      "median_tflops": 60.295477,
+      "first": 2302.0,
+      "last": 2302.0
+    },
+    {
+      "n": 4096,
+      "mode": "FP32acc",
+      "median_tflops": 71.802985,
+      "first": 4590.006836,
+      "last": 4590.006836
+    },
+    {
+      "n": 4096,
+      "mode": "FP16acc",
+      "median_tflops": 67.176037,
+      "first": 4324.0,
+      "last": 4324.0
+    },
+    {
+      "n": 8192,
+      "mode": "FP32acc",
+      "median_tflops": 73.334256,
+      "first": 9180.006836,
+      "last": 9180.006836
+    },
+    {
+      "n": 8192,
+      "mode": "FP16acc",
+      "median_tflops": 65.906077,
+      "first": 8424.0,
+      "last": 8424.0
+    }
+  ]
+}

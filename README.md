@@ -1,3 +1,12 @@
+# Lenovo RTX 3080 Laptop GA104 — experimental Windows port
+
+This working tree adds a hardware-specific GA104 laptop port to the upstream
+MSI desktop project. Start with the [GA104 public overview](docs/GA104-PUBLIC.md)
+for tested hardware, measured results, build requirements and limitations.
+The original upstream README follows, with its separate MSI hardware scope.
+
+---
+
 # RTX 3080 Unlock
 
 MSI RTX 3080 10GB에서 검증한 Windows용 UEFI 연산 언락 실험입니다. USB로 UEFI 앱을 실행한 뒤, 재부팅 없이 Windows로 이어서 부팅합니다.

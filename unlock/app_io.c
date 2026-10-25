@@ -20,6 +20,7 @@ static const ASSET_SPEC Specs[]={
 };
 static VOID LogError(VOID){LogFault=TRUE;if(Gu.armed)Gu.fault=TRUE;}
 VOID GuConsole(const char *Text) {
+  if(Gu.console_suspended)return;
   if(!Table || !Table->ConOut || !Table->ConOut->OutputString){LogError();return;}
   while(*Text) {
     CHAR16 line[128];UINTN n=0;

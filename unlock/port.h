@@ -4,9 +4,7 @@
 #include <Protocol/DevicePath.h>
 #include <stddef.h>
 
-#define GU_BOARD_ID 0x220610deU
-#define GU_BOARD_SUBSYSTEM 0x38901462U
-#define GU_BOARD_CHIP 0xb72000a1U
+#include "board_profile.h"
 typedef struct GU_DMA GU_DMA;
 struct GU_DMA {
   GU_DMA *next;
@@ -25,6 +23,7 @@ typedef struct {
   UINT16 saved_devctl, saved_devctl2;
   UINT8 pcie_version;
   BOOLEAN fault, retained, started, quiesced, armed, owned, display_ok, saved;
+  BOOLEAN console_suspended;
   BOOLEAN master_attributes_pending;
   UINT64 master_original_attributes;
   UINT16 master_original_command;

@@ -1,0 +1,50 @@
+{
+  "same_executable_sha256": "c24d7f5022e2b7337de90f6d0f6c46d4b849e959857180db09e153eb91f83661",
+  "same_cuda_cublas": true,
+  "processes_per_condition": 3,
+  "results": [
+    {
+      "n": 2048,
+      "mode": "FP32acc",
+      "before_tflops": 38.50193,
+      "after_tflops": 58.203696,
+      "gain_percent": 51.17085299360318
+    },
+    {
+      "n": 2048,
+      "mode": "FP16acc",
+      "before_tflops": 60.133391,
+      "after_tflops": 60.295477,
+      "gain_percent": 0.2695440874106003
+    },
+    {
+      "n": 4096,
+      "mode": "FP32acc",
+      "before_tflops": 40.396607,
+      "after_tflops": 71.802985,
+      "gain_percent": 77.74508883877303
+    },
+    {
+      "n": 4096,
+      "mode": "FP16acc",
+      "before_tflops": 66.117104,
+      "after_tflops": 67.176037,
+      "gain_percent": 1.6016022117363082
+    },
+    {
+      "n": 8192,
+      "mode": "FP32acc",
+      "before_tflops": 42.261239,
+      "after_tflops": 73.04242,
+      "gain_percent": 72.83549116957977
+    },
+    {
+      "n": 8192,
+      "mode": "FP16acc",
+      "before_tflops": 67.027171,
+      "after_tflops": 66.338716,
+      "gain_percent": -1.0271282372934842
+    }
+  ],
+  "limitation": "One successful boot; GEMM microbenchmark only; suspend, reboot and long-term stability not validated."
+}

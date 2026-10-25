@@ -26,11 +26,11 @@ static void Word(UINT32 C[64], unsigned Offset, unsigned Value) {
 
 static void Basic(UINT32 C[64]) {
   memset(C, 0, 256);
-  C[0] = 0x220610de;
+  C[0] = GU_BOARD_ID;
   C[1] = 0x00100002;
   C[2] = 0x030000a1;
   C[3] = 0x00800000;
-  C[0x2c / 4] = 0x38901462;
+  C[0x2c / 4] = GU_BOARD_SUBSYSTEM;
   C[0x34 / 4] = 0x40;
   C[0x40 / 4] = 0x00034801;
   C[0x48 / 4] = 0x00020010;
@@ -79,7 +79,7 @@ static void TestCapture(const UINT32 Captured[64]) {
   GU_CAPS Caps;
   memcpy(C, Captured, sizeof(C));
   memcpy(Before, C, sizeof(C));
-  Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps), "captured boot-03 config accepted");
+  Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps), "captured board config accepted");
   Check(Caps.pm == 0x60 && Caps.msi == 0x68 && Caps.pcie == 0x78 &&
         Caps.msix == 0 && Caps.pcie_version == 2,
         "capture returns linked caps only; c8 is unlinked");
@@ -353,6 +353,6 @@ int main(int Argc, char **Argv) {
     fprintf(stderr, "%u/%u checks failed\n", Failures, Checks);
     return 1;
   }
-  printf("PASS %u preflight checks (real boot-03 fixture plus malformed inputs)\n", Checks);
+  printf("PASS %u preflight checks (captured board fixture plus malformed inputs)\n", Checks);
   return 0;
 }

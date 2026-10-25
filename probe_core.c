@@ -7,8 +7,8 @@ static const UINT32 Offsets[PROBE_SAMPLE_COUNT] = {
 };
 
 BOOLEAN ProbeMatches(const UINT32 *Config) {
-  return Config != NULL && Config[0] == 0x220610de &&
-         Config[11] == 0x38901462 && (Config[2] >> 24) == 3;
+  return Config != NULL && Config[0] == PROBE_PCI_ID &&
+         Config[11] == PROBE_SUBSYSTEM_ID && (Config[2] >> 24) == 3;
 }
 
 EFI_STATUS ProbeCollect(EFI_PCI_IO_PROTOCOL *Pci, EFI_BOOT_SERVICES *Bs,

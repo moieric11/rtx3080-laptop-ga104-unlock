@@ -7,6 +7,7 @@
 #include <Protocol/DevicePath.h>
 #include <Protocol/SimpleFileSystem.h>
 #include <Guid/FileInfo.h>
+#include <Protocol/DriverBinding.h>
 
 static UINT32 config[64];
 static UINT64 bar_size;
@@ -31,6 +32,9 @@ static EFI_FILE_PROTOCOL root_dir, marker_dir, run_dir, saved_file;
 static UINT8 device_path[10];
 static BOOLEAN usb_output, marker_present, read_only, occupied_slot, existing_report;
 static BOOLEAN marker_is_file;
+static BOOLEAN bad_ownership, oversized_boot;
+static unsigned ownership_queries, boot_queries;
+static EFI_RUNTIME_SERVICES runtime_services;
 static unsigned fs_opens, run_creates, file_creates, file_writes, file_flushes;
 static unsigned current_file, report_writes, prom_writes, rom_writes;
 static CHAR8 saved_report[32768];
@@ -187,6 +191,30 @@ static EFI_STATUS EFIAPI handle_protocol(EFI_HANDLE handle, EFI_GUID *guid, VOID
   }
   *out = NULL; return EFI_NOT_FOUND;
 }
+static EFI_STATUS EFIAPI protocol_list(EFI_HANDLE handle, EFI_GUID ***out, UINTN *count) {
+  CHECK(handle == &pci);
+  *out = malloc(sizeof(**out)); CHECK(*out != NULL);
+  (*out)[0] = &pci_guid; *count = 1; return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI open_information(EFI_HANDLE handle, EFI_GUID *guid,
+    EFI_OPEN_PROTOCOL_INFORMATION_ENTRY **out, UINTN *count) {
+  CHECK(handle == &pci && !memcmp(guid, &pci_guid, sizeof(*guid)));
+  ownership_queries++;
+  *out = calloc(1, sizeof(**out)); CHECK(*out != NULL);
+  (*out)->AgentHandle = (EFI_HANDLE)3; (*out)->ControllerHandle = &pci;
+  (*out)->Attributes = EFI_OPEN_PROTOCOL_BY_DRIVER; (*out)->OpenCount = 1;
+  *count = bad_ownership ? 129 : 1; return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI get_variable(CHAR16 *name, EFI_GUID *guid,
+    UINT32 *attributes, UINTN *bytes, VOID *data) {
+  (void)guid; (void)attributes; boot_queries++;
+  if (same_name(name, L"BootOrder")) {
+    CHECK(*bytes >= 2); *(UINT16 *)data = 0x12;
+    *bytes = oversized_boot ? 130 : 2; return EFI_SUCCESS;
+  }
+  CHECK(same_name(name, L"Boot0012") && *bytes >= 8);
+  memcpy(data, "12345678", 8); *bytes = 8; return EFI_SUCCESS;
+}
 static EFI_STATUS EFIAPI location(EFI_PCI_IO_PROTOCOL *p, UINTN *seg,
   UINTN *bus, UINTN *dev, UINTN *fn) {
   CHECK(p == &pci); *seg = 0; *bus = 1; *dev = 0; *fn = 0; return EFI_SUCCESS;
@@ -195,8 +223,8 @@ static void reset(void) {
   memset(config, 0, sizeof(config));
   memset(&pci, 0, sizeof(pci)); memset(&bs, 0, sizeof(bs));
   memset(&result, 0, sizeof(result));
-  config[0] = 0x220610de; config[1] = 6; config[2] = 0x030000a1;
-  config[11] = 0x38901462;
+  config[0] = PROBE_PCI_ID; config[1] = 6; config[2] = 0x030000a1;
+  config[11] = PROBE_SUBSYSTEM_ID;
   bar_size = 0x01000000; failed_offset = 0xffffffff;
   config_status = bar_status = EFI_SUCCESS; reads = writes = prom_reads = 0;
   pci.Pci.Read = read_config; pci.Pci.Write = write_config;
@@ -222,6 +250,8 @@ static void reset(void) {
   device_path[8] = 4; device_path[9] = 0;
   usb_output = read_only = occupied_slot = existing_report = FALSE; marker_present = TRUE;
   marker_is_file = FALSE;
+  bad_ownership = oversized_boot = FALSE; ownership_queries = boot_queries = 0;
+  memset(&runtime_services, 0, sizeof(runtime_services));
   fs_opens = run_creates = file_creates = file_writes = file_flushes = 0;
   current_file = report_writes = prom_writes = rom_writes = 0; saved_report[0] = 0;
 }
@@ -231,7 +261,7 @@ int main(void) {
   reset();
   CHECK(ProbeMatches(config));
   CHECK(ProbeCollect(&pci, &bs, &result) == EFI_SUCCESS);
-  CHECK(result.Config[11] == 0x38901462 && result.BarSize == 0x1000000);
+  CHECK(result.Config[11] == PROBE_SUBSYSTEM_ID && result.BarSize == 0x1000000);
   CHECK(reads == 16 && writes == 0);
   CHECK(result.Samples[0].Value == 0x170000a1);
   CHECK(ProbeReadProm(&pci, &result, buf, sizeof(buf)) == EFI_SUCCESS);
@@ -288,6 +318,19 @@ int main(void) {
   CHECK(report_writes == 1 && prom_writes == 1 && rom_writes == 1);
   CHECK(file_writes == 3 && file_flushes == 3 && writes == 0 && prom_reads == 1024);
   CHECK(strstr(saved_report, "matching_cards=0x0000000000000001") != NULL);
+  reset(); usb_output = enumerate_target = TRUE;
+  bs.ProtocolsPerHandle = protocol_list; bs.OpenProtocolInformation = open_information;
+  runtime_services.GetVariable = get_variable; system_table.RuntimeServices = &runtime_services;
+  CHECK(efi_main((EFI_HANDLE)1, &system_table) == EFI_SUCCESS);
+  CHECK(ownership_queries == 1 && boot_queries == 2 && writes == 0);
+  CHECK(strstr(saved_report, "[OWNERSHIP]") && strstr(saved_report, "agent_handle=0x0000000000000003"));
+  CHECK(strstr(saved_report, "boot_option_bytes=3132333435363738"));
+  reset(); usb_output = enumerate_target = bad_ownership = oversized_boot = TRUE;
+  bs.ProtocolsPerHandle = protocol_list; bs.OpenProtocolInformation = open_information;
+  runtime_services.GetVariable = get_variable; system_table.RuntimeServices = &runtime_services;
+  CHECK(efi_main((EFI_HANDLE)1, &system_table) == EFI_SUCCESS);
+  CHECK(ownership_queries == 1 && boot_queries == 1 && writes == 0);
+  CHECK(strstr(saved_report, "ownership=invalid or oversized entries"));
   reset(); usb_output = TRUE; occupied_slot = TRUE;
   CHECK(efi_main((EFI_HANDLE)1, &system_table) == EFI_SUCCESS);
   CHECK(run_creates == 1 && report_writes == 1);

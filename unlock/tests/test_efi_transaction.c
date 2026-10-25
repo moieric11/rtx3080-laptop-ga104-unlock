@@ -6,6 +6,10 @@
 #include <string.h>
 #include <stdarg.h>
 #include <malloc.h>
+#ifndef _WIN32
+#define _aligned_malloc(bytes, alignment) aligned_alloc((alignment), (bytes))
+#define _aligned_free free
+#endif
 #undef EPROTO
 #undef EBADMSG
 #undef EOVERFLOW
@@ -26,6 +30,29 @@
 #define SS0 0x82381cU
 #define SS1 0x823820U
 #define PLM 0x823804U
+#define FB_DELTA (((UINT64)GU_BOARD_FB_MB - 0x2800ULL) << 20)
+static BOOLEAN use_capture;
+static UINT32 capture_config[64], capture_offsets[16], capture_values[16];
+static void fail(const char *,const char *,int);
+#define CHECK(x) ((x)?(void)0:fail(#x,__FILE__,__LINE__))
+static VOID load_capture(const char *path) {
+  FILE *file=fopen(path,"rb");CHECK(file);
+  char line[256];unsigned configs=0,samples=0;unsigned long long offset,value,status;
+  while(fgets(line,sizeof(line),file)) {
+    if(sscanf(line,"config_offset=0x%llx",&offset)==1) {
+      CHECK(configs<64 && offset==configs*4U && fgets(line,sizeof(line),file));
+      CHECK(sscanf(line,"value=0x%llx",&value)==1 && value<=0xffffffffULL);
+      capture_config[configs++]=(UINT32)value;
+    } else if(sscanf(line,"register=0x%llx",&offset)==1) {
+      CHECK(samples<16 && offset<0x1000000 && !(offset&3) && fgets(line,sizeof(line),file));
+      CHECK(sscanf(line,"status=0x%llx",&status)==1 && !status && fgets(line,sizeof(line),file));
+      CHECK(sscanf(line,"value=0x%llx",&value)==1 && value<=0xffffffffULL);
+      capture_offsets[samples]=(UINT32)offset;capture_values[samples++]=(UINT32)value;
+    }
+  }
+  fclose(file);CHECK(configs==64 && samples==16 && capture_config[0]==GU_BOARD_ID && capture_config[11]==GU_BOARD_SUBSYSTEM);
+  use_capture=TRUE;
+}
 enum scenario {
   SUCCESS, FWSEC_TIMEOUT, POST_FLR_TIMEOUT, BME_READBACK_FAIL,
   MMIO_WRITE_FAIL, FLUSH_FAIL, FLR_WRITE_FAIL, UNMAP_FAIL,
@@ -67,12 +94,11 @@ static void fail(const char *expression,const char *file,int line) {
   size_t length=strlen(fake.log);
   fprintf(stderr,"ASSERTION FAILED [%s] %s:%d: %s\n",case_names[fake.mode],file,line,expression);
   fprintf(stderr,"started=%u quiesced=%u fault=%u retained=%u GSP=%zu SEC2=%zu FLR=%zu mappings=%zu buffers=%zu\n",
-    Gu.started,Gu.quiesced,Gu.fault,Gu.retained,fake.gsp_starts,fake.sec2_starts,
-    fake.flrs,fake.live_maps,fake.live_buffers);
+    Gu.started,Gu.quiesced,Gu.fault,Gu.retained,(size_t)fake.gsp_starts,(size_t)fake.sec2_starts,
+    (size_t)fake.flrs,(size_t)fake.live_maps,(size_t)fake.live_buffers);
   fprintf(stderr,"%s",fake.log+(length>5000?length-5000:0));
   exit(1);
 }
-#define CHECK(x) ((x)?(void)0:fail(#x,__FILE__,__LINE__))
 static VOID trace_write(UINT32 kind,UINT32 width,UINT32 offset,UINT32 value) {
   CHECK(fake.trace_count<8192);UINT32 *r=fake.write_trace[fake.trace_count++];
   r[0]=kind;r[1]=width;r[2]=offset;r[3]=value;
@@ -114,7 +140,7 @@ static VOID check_fwsec_image(void) {
   CHECK(last_source>=0xdf00);UINT8 *image=dma_pointer(last_source-0xdf00,0xe700);
   CHECK(!memcmp(gsp_dmem,image+0xdf00,sizeof(gsp_dmem)));
   CHECK(!memcmp(gsp_dmem+0x5a4,prom+0x43060+0x300,384));
-  CHECK(le32(gsp_dmem+0x7c0+32)==0x27fe00);
+  CHECK(le32(gsp_dmem+0x7c0+32)==0x27fe00+(FB_DELTA>>12));
   CHECK(le32(gsp_dmem+0x7c0+36)==0x100);
 }
 static VOID check_booter_publication(void) {
@@ -122,9 +148,9 @@ static VOID check_booter_publication(void) {
   UINT8 *meta=dma_pointer(meta_address,256);fake.meta_dma=meta_address;
   CHECK(le64(meta)==GU_WPR_META_MAGIC && le64(meta+8)==1);
   CHECK(le64(meta+24)==0x5053000 && le64(meta+80)==0xfa00);
-  CHECK(le64(meta+112)==0x275400000ULL && le64(meta+136)==0x27ada0000ULL);
-  CHECK(le64(meta+144)==0x27fdfa000ULL && le64(meta+152)==0x27fe00000ULL);
-  CHECK(le64(meta+168)==0x27ff00000ULL && le64(meta+176)==0x280000000ULL);
+  CHECK(le64(meta+112)==0x275400000ULL+FB_DELTA && le64(meta+136)==0x27ada0000ULL+FB_DELTA);
+  CHECK(le64(meta+144)==0x27fdfa000ULL+FB_DELTA && le64(meta+152)==0x27fe00000ULL+FB_DELTA);
+  CHECK(le64(meta+168)==0x27ff00000ULL+FB_DELTA && le64(meta+176)==0x280000000ULL+FB_DELTA);
   CHECK(!memcmp(dma_pointer(le64(meta+72),64000),GuAssets[1].firmware.data,64000));
   CHECK(!memcmp(dma_pointer(le64(meta+32),24576),GuAssets[3].firmware.data,24576));
   /* Walk published DMA addresses as firmware would; expected ELF bytes are pinned. */
@@ -273,7 +299,7 @@ static EFI_STATUS EFIAPI write_memory(EFI_PCI_IO_PROTOCOL *p,EFI_PCI_IO_PROTOCOL
     CHECK(fake.pci_attributes&EFI_PCI_IO_ATTRIBUTE_BUS_MASTER);
     fake.gsp_starts++;CHECK(fake.gsp_starts==1 && (config[4]&4));check_fwsec_image();
     if(fake.mode!=FWSEC_NO_WPR && fake.mode!=PIO_UNAVAILABLE_NO_WPR) {
-      registers[0x1fa824/4]=0x27fe000;registers[0x1fa828/4]=0x27feff0;
+      registers[0x1fa824/4]=0x27fe000+(UINT32)(FB_DELTA>>8);registers[0x1fa828/4]=0x27feff0+(UINT32)(FB_DELTA>>8);
     }
     if(fake.mode==FWSEC_ERROR_CODE)registers[0x1438/4]=0x10000;
     registers[GSP/4+0x100/4]=fake.mode==FWSEC_TIMEOUT?2:0x10;
@@ -322,27 +348,31 @@ static VOID setup(enum scenario mode) {
   pci.AllocateBuffer=allocate_buffer;pci.FreeBuffer=free_buffer;pci.Map=map_buffer;pci.Unmap=unmap_buffer;
   pci.Pci.Read=read_config;pci.Pci.Write=write_config;pci.Mem.Read=read_memory;pci.Mem.Write=write_memory;pci.Flush=flush;
   pci.Attributes=master_attributes;fake.pci_attributes=EFI_PCI_IO_ATTRIBUTE_IO|EFI_PCI_IO_ATTRIBUTE_MEMORY;
-  *(UINT32 *)(config+0)=0x220610de;*(UINT32 *)(config+0x2c)=0x38901462;
+  *(UINT32 *)(config+0)=GU_BOARD_ID;*(UINT32 *)(config+0x2c)=GU_BOARD_SUBSYSTEM;
   *(UINT32 *)(config+4)=0x00100003;*(UINT32 *)(config+8)=0x030000a1;*(UINT32 *)(config+12)=0x00800010;
-  *(UINT32 *)(config+0x10)=0x84000000;*(UINT32 *)(config+0x14)=0xc;*(UINT32 *)(config+0x18)=0x60;
+  *(UINT32 *)(config+0x10)=(UINT32)GU_BOARD_BAR0;*(UINT32 *)(config+0x14)=0xc;*(UINT32 *)(config+0x18)=0x60;
   *(UINT32 *)(config+0x1c)=0xc;*(UINT32 *)(config+0x20)=0x64;*(UINT32 *)(config+0x24)=0x5001;
   *(UINT32 *)(config+0x30)=0x85000000;config[0x34]=0x60;config[0x3c]=0xff;
   *(UINT32 *)(config+0x60)=0x48036801;*(UINT32 *)(config+0x64)=8;
   *(UINT32 *)(config+0x68)=0x00807805;*(UINT32 *)(config+0x78)=0x0012b410;
   *(UINT32 *)(config+0x7c)=0x112c8de1;*(UINT32 *)(config+0x80)=0x00092930;
   *(UINT32 *)(config+0xc8)=0x00050011;
-  registers[0]=0xb72000a1;registers[0x118128/4]=0x8b8f;registers[0x118234/4]=0x03ff;
+  registers[0]=GU_BOARD_CHIP;registers[0x118128/4]=0x8b8f;registers[0x118234/4]=0x03ff;
   registers[GSP/4+0x100/4]=0x10;registers[0x1fa824/4]=0x1ffffe00;
-  registers[PLM/4]=0xffffff8f;registers[SS0/4]=0x46254040;registers[SS1/4]=3;
-  registers[0x1183a4/4]=0x2800;registers[0x625f04/4]=1;registers[0x1fa7c8/4]=0x45cb8f;
-  registers[0x1fa82c/4]=0x100000;registers[0x1fa830/4]=0x26ffff0;
+  registers[PLM/4]=0xffffff8f;registers[SS0/4]=GU_BOARD_COLD_SS0;registers[SS1/4]=GU_BOARD_COLD_SS1;
+  registers[0x1183a4/4]=GU_BOARD_FB_MB;registers[0x625f04/4]=1;registers[0x1fa7c8/4]=0x45cb8f;
+  registers[0x1fa82c/4]=0x100000;registers[0x1fa830/4]=0x26ffff0+(UINT32)(FB_DELTA>>8);
   registers[0x824148/4]=1;registers[0x8241e0/4]=3;
   registers[(GSP+0xf4)/4]=registers[(SEC2+0xf4)/4]=1U<<31;
   registers[(GSP+0x118)/4]=registers[(SEC2+0x118)/4]=2;
   registers[(GSP+0x1c0)/4]=0x40;
   registers[(GSP+0x94)/4]=0x12345678;
   memcpy((UINT8 *)registers+0x300000,prom,sizeof(prom));
-  GuInit(&bs,&pci);Gu.bar_base=0x84000000;Gu.bar_size=sizeof(registers);
+  if(use_capture) {
+    memcpy(config,capture_config,sizeof(config));
+    for(UINTN i=0;i<16;i++)registers[capture_offsets[i]/4]=capture_values[i];
+  }
+  GuInit(&bs,&pci);Gu.bar_base=GU_BOARD_BAR0;Gu.bar_size=sizeof(registers);
   Gu.pcie_cap=0x78;Gu.pcie_version=2;Gu.pm_cap=0x60;Gu.msi_cap=0x68;Gu.msix_cap=0;
   Gu.owned=Gu.armed=Gu.display_ok=TRUE;Gu.display_check=display_check;
 }
@@ -372,7 +402,11 @@ static VOID load_fixture_assets(const char *prom_path,const char *assets_path) {
   }
 }
 int main(int argc,char **argv) {
-  setvbuf(stdout,NULL,_IONBF,0);CHECK(argc==3);load_fixture_assets(argv[1],argv[2]);
+  setvbuf(stdout,NULL,_IONBF,0);CHECK(argc==3 || argc==4);load_fixture_assets(argv[1],argv[2]);
+  if(argc==4)load_capture(argv[3]);
+#ifdef GU_PROFILE_LENOVO_GA104
+  CHECK(use_capture);
+#endif
   for(int mode=SUCCESS;mode<SCENARIO_COUNT;mode++) {
     setup((enum scenario)mode);UINT64 mask=0xffffffffffffULL;
     struct pci_dev device={.dev={.dma_mask=&mask,.coherent_dma_mask=0xfffffffffULL},.pm_cap=0x60,.refs=1};
@@ -410,7 +444,7 @@ int main(int argc,char **argv) {
       if(mode==DISPLAY_CHANGED)CHECK(fake.gsp_starts==1 && fake.sec2_starts==1 && !fake.flrs);
       if(mode==FWSEC_NO_WPR || mode==PIO_UNAVAILABLE_NO_WPR) {
         CHECK(fake.gsp_starts==1 && !fake.sec2_starts && !fake.flrs);
-        CHECK(registers[SS0/4]==0x46254040 && registers[SS1/4]==3);
+        CHECK(registers[SS0/4]==GU_BOARD_COLD_SS0 && registers[SS1/4]==GU_BOARD_COLD_SS1);
         CHECK(strstr(fake.log,"FWSEC halt observation:") && strstr(fake.log,"observed_nonhalt=0"));
         CHECK(strstr(fake.log,"FWSEC snapshot: phase=post-halt") && strstr(fake.log,"value=0x12345678"));
       }
@@ -427,7 +461,7 @@ int main(int argc,char **argv) {
     CHECK(fake.gsp_starts<=1 && fake.sec2_starts<=1 && fake.flrs<=1);
     CHECK(!fake.pio_reads && !fake.pio_writes && !fake.dmem_reads);
     printf("EFI integration %s: result=%d safe=%u retained=%u live_maps=%zu starts=%zu/%zu flr=%zu PASS\n",
-      case_names[mode],result,safe,Gu.retained,fake.live_maps,fake.gsp_starts,fake.sec2_starts,fake.flrs);
+      case_names[mode],result,safe,Gu.retained,(size_t)fake.live_maps,(size_t)fake.gsp_starts,(size_t)fake.sec2_starts,(size_t)fake.flrs);
     dispose_host_fixture();
   }
   for(UINTN i=0;i<5;i++)free((VOID *)GuAssets[i].firmware.data);

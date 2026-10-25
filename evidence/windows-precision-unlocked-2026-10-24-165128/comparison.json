@@ -1,0 +1,295 @@
+{
+  "previous_state": "stock",
+  "current_state": "unlocked",
+  "previous_path": "evidence\\windows-precision-stock-2026-10-24-164155",
+  "results": [
+    {
+      "n": 2048,
+      "scenario": "FP16_accFP16_outFP16",
+      "previous": 61.286636,
+      "current": 64.096333,
+      "unit": "TFLOPS",
+      "change_percent": 4.584518230042844
+    },
+    {
+      "n": 2048,
+      "scenario": "FP16_accFP32_outFP32",
+      "previous": 38.634926,
+      "current": 62.31092,
+      "unit": "TFLOPS",
+      "change_percent": 61.28132353611859
+    },
+    {
+      "n": 2048,
+      "scenario": "FP16_accFP32_outFP16",
+      "previous": 38.79125,
+      "current": 63.191018,
+      "unit": "TFLOPS",
+      "change_percent": 62.90018496439276
+    },
+    {
+      "n": 2048,
+      "scenario": "BF16_accFP32_outFP32",
+      "previous": 39.084952,
+      "current": 64.839484,
+      "unit": "TFLOPS",
+      "change_percent": 65.89372810282586
+    },
+    {
+      "n": 2048,
+      "scenario": "BF16_accFP32_outBF16",
+      "previous": 39.313922,
+      "current": 66.774991,
+      "unit": "TFLOPS",
+      "change_percent": 69.85074905525835
+    },
+    {
+      "n": 2048,
+      "scenario": "TF32_accFP32_outFP32",
+      "previous": 19.429318,
+      "current": 34.66367,
+      "unit": "TFLOPS",
+      "change_percent": 78.40909289765091
+    },
+    {
+      "n": 2048,
+      "scenario": "FP32_strict_accFP32_outFP32",
+      "previous": 11.767292,
+      "current": 11.216591,
+      "unit": "TFLOPS",
+      "change_percent": -4.679929757840629
+    },
+    {
+      "n": 2048,
+      "scenario": "INT8_cuBLAS_accINT32_outINT32",
+      "previous": 35.906294,
+      "current": 36.731727,
+      "unit": "TOPS",
+      "change_percent": 2.298853231692455
+    },
+    {
+      "n": 2048,
+      "scenario": "FP8_E4M3_decodeFP16_accFP32",
+      "previous": 33.773963,
+      "current": 49.820982,
+      "unit": "TFLOPS",
+      "change_percent": 47.51298803756016
+    },
+    {
+      "n": 2048,
+      "scenario": "FP8_E5M2_decodeFP16_accFP32",
+      "previous": 33.961977,
+      "current": 51.306473,
+      "unit": "TFLOPS",
+      "change_percent": 51.070336688585584
+    },
+    {
+      "n": 2048,
+      "scenario": "INT4_accINT32_outINT32",
+      "previous": 186.413508,
+      "current": 185.897123,
+      "unit": "TOPS",
+      "change_percent": -0.277010505054176
+    },
+    {
+      "n": 2048,
+      "scenario": "INT8_CUTLASS_accINT32_outINT32",
+      "previous": 120.699399,
+      "current": 120.699399,
+      "unit": "TOPS",
+      "change_percent": 0.0
+    },
+    {
+      "n": 4096,
+      "scenario": "FP16_accFP16_outFP16",
+      "previous": 55.999886,
+      "current": 70.511023,
+      "unit": "TFLOPS",
+      "change_percent": 25.91279739390897
+    },
+    {
+      "n": 4096,
+      "scenario": "FP16_accFP32_outFP32",
+      "previous": 40.715221,
+      "current": 75.350303,
+      "unit": "TFLOPS",
+      "change_percent": 85.0666683106055
+    },
+    {
+      "n": 4096,
+      "scenario": "FP16_accFP32_outFP16",
+      "previous": 41.020088,
+      "current": 75.41381,
+      "unit": "TFLOPS",
+      "change_percent": 83.8460463566046
+    },
+    {
+      "n": 4096,
+      "scenario": "BF16_accFP32_outFP32",
+      "previous": 40.094915,
+      "current": 75.509269,
+      "unit": "TFLOPS",
+      "change_percent": 88.32629773625908
+    },
+    {
+      "n": 4096,
+      "scenario": "BF16_accFP32_outBF16",
+      "previous": 40.76159,
+      "current": 77.875097,
+      "unit": "TFLOPS",
+      "change_percent": 91.05019455816125
+    },
+    {
+      "n": 4096,
+      "scenario": "TF32_accFP32_outFP32",
+      "previous": 20.418,
+      "current": 39.170504,
+      "unit": "TFLOPS",
+      "change_percent": 91.84300127338625
+    },
+    {
+      "n": 4096,
+      "scenario": "FP32_strict_accFP32_outFP32",
+      "previous": 10.473895,
+      "current": 11.561773,
+      "unit": "TFLOPS",
+      "change_percent": 10.386565838210139
+    },
+    {
+      "n": 4096,
+      "scenario": "INT8_cuBLAS_accINT32_outINT32",
+      "previous": 33.998536,
+      "current": 34.773684,
+      "unit": "TOPS",
+      "change_percent": 2.2799452305828805
+    },
+    {
+      "n": 4096,
+      "scenario": "FP8_E4M3_decodeFP16_accFP32",
+      "previous": 37.360537,
+      "current": 61.251673,
+      "unit": "TFLOPS",
+      "change_percent": 63.947517670851454
+    },
+    {
+      "n": 4096,
+      "scenario": "FP8_E5M2_decodeFP16_accFP32",
+      "previous": 37.383951,
+      "current": 62.101899,
+      "unit": "TFLOPS",
+      "change_percent": 66.11914294452184
+    },
+    {
+      "n": 4096,
+      "scenario": "INT4_accINT32_outINT32",
+      "previous": 191.057266,
+      "current": 194.307237,
+      "unit": "TOPS",
+      "change_percent": 1.7010454865401314
+    },
+    {
+      "n": 4096,
+      "scenario": "INT8_CUTLASS_accINT32_outINT32",
+      "previous": 98.889464,
+      "current": 115.356877,
+      "unit": "TOPS",
+      "change_percent": 16.65234326682161
+    },
+    {
+      "n": 8192,
+      "scenario": "FP16_accFP16_outFP16",
+      "previous": 63.15571,
+      "current": 67.03764,
+      "unit": "TFLOPS",
+      "change_percent": 6.146601787866834
+    },
+    {
+      "n": 8192,
+      "scenario": "FP16_accFP32_outFP32",
+      "previous": 42.608802,
+      "current": 72.800992,
+      "unit": "TFLOPS",
+      "change_percent": 70.8590445701806
+    },
+    {
+      "n": 8192,
+      "scenario": "FP16_accFP32_outFP16",
+      "previous": 42.800299,
+      "current": 73.560335,
+      "unit": "TFLOPS",
+      "change_percent": 71.86874091697348
+    },
+    {
+      "n": 8192,
+      "scenario": "BF16_accFP32_outFP32",
+      "previous": 42.840001,
+      "current": 73.413224,
+      "unit": "TFLOPS",
+      "change_percent": 71.3660650941628
+    },
+    {
+      "n": 8192,
+      "scenario": "BF16_accFP32_outBF16",
+      "previous": 42.880635,
+      "current": 74.367864,
+      "unit": "TFLOPS",
+      "change_percent": 73.42995037270322
+    },
+    {
+      "n": 8192,
+      "scenario": "TF32_accFP32_outFP32",
+      "previous": 21.330536,
+      "current": 37.884847,
+      "unit": "TFLOPS",
+      "change_percent": 77.60850922827258
+    },
+    {
+      "n": 8192,
+      "scenario": "FP32_strict_accFP32_outFP32",
+      "previous": 14.749353,
+      "current": 15.116417,
+      "unit": "TFLOPS",
+      "change_percent": 2.4886786559383367
+    },
+    {
+      "n": 8192,
+      "scenario": "INT8_cuBLAS_accINT32_outINT32",
+      "previous": 34.70316,
+      "current": 34.641302,
+      "unit": "TOPS",
+      "change_percent": -0.17824889721856918
+    },
+    {
+      "n": 8192,
+      "scenario": "FP8_E4M3_decodeFP16_accFP32",
+      "previous": 40.904452,
+      "current": 68.730472,
+      "unit": "TFLOPS",
+      "change_percent": 68.02687394516373
+    },
+    {
+      "n": 8192,
+      "scenario": "FP8_E5M2_decodeFP16_accFP32",
+      "previous": 39.213059,
+      "current": 68.582314,
+      "unit": "TFLOPS",
+      "change_percent": 74.89661798637029
+    },
+    {
+      "n": 8192,
+      "scenario": "INT4_accINT32_outINT32",
+      "previous": 180.120246,
+      "current": 187.389503,
+      "unit": "TOPS",
+      "change_percent": 4.035780075494677
+    },
+    {
+      "n": 8192,
+      "scenario": "INT8_CUTLASS_accINT32_outINT32",
+      "previous": 95.803513,
+      "current": 95.626471,
+      "unit": "TOPS",
+      "change_percent": -0.1847969812964978
+    }
+  ]
+}

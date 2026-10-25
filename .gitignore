@@ -1,4 +1,9 @@
 # Build products, local assets and test captures
+/linux-usb-evidence/
+/ga104-probe-package/
+/ga104-handoff-package/
+/ga104-unlock-package/
+/analysis/research/
 **/build/
 /dist/
 /assets/
