@@ -1,59 +1,133 @@
-# Lenovo RTX 3080 Laptop GA104 — experimental Windows port
+# RTX 3080 Laptop GA104 Compute Unlock
 
-This working tree adds a hardware-specific GA104 laptop port to the upstream
-MSI desktop project. Start with the [GA104 public overview](docs/GA104-PUBLIC.md)
-for tested hardware, measured results, build requirements and limitations.
-The original upstream README follows, with its separate MSI hardware scope.
+Experimental UEFI compute unlock for a **Lenovo RTX 3080 Laptop 16 GiB (GA104)**,
+with Windows before/after benchmarks. Boot the USB, run one manually confirmed
+operation, then continue to Windows in the same firmware session.
 
----
+**[Download the complete USB package](https://github.com/moieric11/rtx3080-laptop-ga104-unlock/releases/tag/v0.4.1-experimental)**
 
-# RTX 3080 Unlock
+**[Step-by-step installation tutorial](docs/INSTALL.md)**
 
-MSI RTX 3080 10GB에서 검증한 Windows용 UEFI 연산 언락 실험입니다. USB로 UEFI 앱을 실행한 뒤, 재부팅 없이 Windows로 이어서 부팅합니다.
+The release ZIP includes `BOOTX64.EFI`, all five required firmware files,
+a Windows USB copying assistant, English instructions, checksums, licenses and
+corresponding source code. No compiler or Python installation is needed to use
+the USB package. GitHub's automatic source-code download is not bootable.
 
-**지원 범위는 아래의 실험 환경입니다.** 다른 제조사의 RTX 3080이나 RTX 3090을 지원하는 범용 도구가 아닙니다. 장치·화면 경로·펌웨어 검사에 맞지 않으면 실행을 거부합니다.
+## Tested hardware
 
-## USB로 사용하기
+| Component | Tested configuration |
+| --- | --- |
+| Laptop | Lenovo 82N6, AMD Ryzen 9 5900HX |
+| GPU | RTX 3080 Laptop, GA104, 16 GiB |
+| PCI / subsystem | `10de:24dc` / `17aa:3a58` |
+| VBIOS | `94.04.3f.00.c5` |
+| Graphics mode | Discrete |
+| Windows benchmark environment | NVIDIA 617.14, CUDA 13.4 |
 
-1. [USB 준비 및 부팅 안내](docs/USB-BOOT.md)에 따라 FAT32 USB와 필요한 파일을 준비합니다.
-2. UEFI 부팅 메뉴에서 USB를 선택합니다.
-3. 사전 검사가 끝나 `READY`가 표시되면 **U를 한 번** 누릅니다.
-4. 성공 후 펌웨어 메뉴로 돌아오면 **Windows Boot Manager**를 선택합니다. 이 사이에 재부팅하지 않습니다.
+Other laptops, boards and firmware versions have not been validated. The
+application checks the exact board, firmware and cold GPU state. Do not bypass
+those checks to force another GPU through.
 
-USB 템플릿에는 EFI, 소스, 사용법과 라이선스가 들어 있습니다. 실행 자산 5개는 로컬에서 추가해야 합니다. `unlock/assets.json`에 파일명·크기·SHA256이 정리되어 있습니다. 템플릿만 복사한 상태에서는 실행할 수 없습니다.
+This is experimental firmware-level software. Display loss and a forced
+power-off are possible. It does not flash the VBIOS or install a Windows driver.
+Persistence across restart, sleep/resume and long-term stability are not
+established. It does not enable ECC.
 
-## 확인한 환경
+## Quick start
 
-- MSI RTX 3080 10GB: PCI `10de:2206`, subsystem `1462:3890`, VBIOS `94.02.59.00.aa`.
-- ASUS TUF GAMING B660M-PLUS D4, Intel i5-13600K / UHD 770 화면 출력.
-- Windows 11 Pro build 26200, NVIDIA 610.60 드라이버.
-- v0.10 실제 실행: UEFI transaction과 정리 완료 후 Windows CUDA 측정.
+1. Read the [installation tutorial](docs/INSTALL.md) and check the hardware.
+2. Download and extract the complete release ZIP, then verify its SHA256.
+3. Copy its contents to the root of a FAT32 UEFI USB, or run
+   `Install-USB.ps1 -DriveLetter F` from the extracted package with your USB letter.
+4. Fully shut down, then boot the USB in Discrete mode with Secure Boot disabled.
+5. After the checks pass, press **U once**. Keep the USB connected.
+6. After success and display recovery, select **Windows Boot Manager without
+   rebooting**. Measure your workload under matching before/after conditions.
 
-현재 코드는 BDF `0000:01:00.0`, BAR, 보드 PROM 및 Intel 화면 경로도 검사합니다. 같은 제품명이어도 다른 PC에서의 동작은 확인되지 않았습니다. 새 FAT32 USB에서의 실제 부팅은 별도 검증 대상입니다.
+Esc or a 30-second timeout cancels. If the screen stays black for more than
+three minutes, or a `STOP` message appears, power off with the physical button.
+Reports are written to `RTX3080-UNLOCK/RUNxx/REPORT.TXT` on the USB.
 
-## 측정 결과
+## Measured Windows results
 
-| 측정 | 이전 TFLOPS | 적용 후 TFLOPS | 변화 |
+Matched October 23 runs used the same executable and CUDA/cuBLAS versions, with
+three processes per condition. These are dense GEMM measurements with FP16
+inputs and FP32 accumulation.
+
+| Matrix size | Stock TFLOPS | Unlocked TFLOPS | Change |
 | --- | ---: | ---: | ---: |
-| FP32 pedantic | 22.057145 | 21.922047 | −0.61% |
-| FP16 Tensor / FP32 누산 | 60.874030 | 109.217226 | +79.42% |
-| BF16 Tensor / FP32 누산 | 60.910719 | 113.090926 | +85.67% |
+| 2048 | 38.50 | 58.20 | +51.2% |
+| 4096 | 40.40 | 71.80 | +77.7% |
+| 8192 | 42.26 | 73.04 | +72.8% |
 
-동일 실행 파일과 CUDA/cuBLAS 환경의 4096×4096 GEMM 측정입니다. 기준값은 한 프로세스, 적용 후 값은 세 프로세스 중앙값들의 중앙값입니다. 게임 성능, 모든 AI 작업의 향상률, 장시간 안정성이나 콜드부팅 후 지속성을 의미하지 않습니다. [측정 자료](results/benchmark.json)와 [실제 UEFI 실행 로그](evidence/unlock-boot-09/REPORT.TXT)를 함께 제공합니다. 측정 자료에서는 개인 경로와 장치 UUID를 제외했습니다.
+FP16 accumulation control measurements stayed close to their stock values.
+These results do not establish gaming gains or the same improvement in every
+AI application. See the [stock runs](evidence/windows-baseline-2026-10-23),
+[unlocked runs](evidence/windows-after-2026-10-23),
+[UEFI report](evidence/lenovo-ga104-unlock01/REPORT.TXT) and
+[precision comparison](GA104-PRECISION-SUITE.md).
 
-## 빌드와 검사
+## Package contents and firmware
 
-Windows 개발 환경: LLVM/clang 12 + lld-link(VS2019 BuildTools), MSVC 환경(VS2022 Community), Python 3.9 이상. 스크립트의 기본 도구 경로는 이 설치 구성을 기준으로 합니다.
+`BOOTX64.EFI` is the UEFI application. It also requires the five exact files
+listed in [unlock/assets.json](unlock/assets.json), provided under
+`RTX3080-UNLOCK/ASSETS` in the release. They supply the GPU-side Booter, signature,
+GSP image, bootstrap and descriptor used during the transaction. Their names
+include `ga102` as expected by the existing GA104 path; do not rename them.
+
+The release uses the `GU_COLD_SELECTOR_VARIANTS` build, accepting only three
+observed cold selector states on this Lenovo while retaining the other checks.
+Its EFI SHA256 is
+`4b58554e18b0a2e987040cf3c006aa122bfd84ccd0f2dbee11cb225da7340000`.
+The same build bytes were reproduced for this release. The newly assembled
+archive and copying assistant have not themselves undergone a fresh hardware
+boot test. See [release notes](docs/RELEASE-NOTES.md).
+
+## Build from source
+
+For the UEFI build, install Python 3.9+ on Windows and clang/lld in WSL. Run from
+the repository root on a Windows drive accessible to WSL:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\unlock\build.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\unlock\test-all.ps1
+python .\tools\build_ga104_unlock.py --cold-selector-variants
 ```
 
-빌드는 `unlock/build/BOOTX64.EFI`를 만들고 PE 형식을 검사합니다. 검사 명령은 GPU를 실행하지 않습니다. 추가 fixture를 사용하는 전체 모의 검사와 패키지 생성 방법은 [TESTING.md](TESTING.md)를 참고하세요.
+Output: `build/ga104-cold-selectors/GA104-UNLOCK.EFI`, with PE verification JSON.
+The builder invokes `wsl -e clang` and `wsl -e lld-link` and verifies an AMD64 EFI
+application without imports. The reproduced release used LLVM 21.1.8.
 
-## 출처와 라이선스
+To assemble a complete release using separately supplied, matching assets:
 
-이 프로젝트의 포트와 재사용 코어는 **GPL-2.0-only**입니다. 핵심 코드는 [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)에서 가져왔습니다. 포함된 EDK2 헤더와 관련 고지는 각각의 라이선스를 따릅니다.
+```powershell
+python .\tools\package_ga104_release.py --assets C:\path\to\firmware --output .\dist\v0.4.1
+```
 
-[LICENSE](LICENSE)와 [외부 코드 고지](THIRD_PARTY_NOTICES.md)를 확인하세요.
+The packager requires a clean, committed source checkout, the reviewed EFI hash
+and all five exact firmware hashes. It embeds `git archive HEAD` as `SOURCE.zip`
+and rejects an existing output directory. It never writes to a USB.
+
+`python tools/test_ga104_port.py` runs offline checks with local firmware and
+VBIOS fixtures; private VBIOS captures are not included in this public source.
+The Windows benchmark scripts additionally require MSVC and CUDA, and some
+retain development-machine paths. [check-unlock.cmd](CHECK-UNLOCK.md) is an
+optional performance heuristic requiring the exact reference executable.
+
+The inherited MSI desktop target is separate from this laptop port.
+[Its original USB instructions](docs/USB-BOOT.md) do not describe the GA104
+release procedure.
+
+## Attribution and license
+
+Based on [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public)
+and [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock).
+The port and reusable unlock core are **GPL-2.0-only**. EDK2 and other third-party
+components retain their own notices; binary firmware is not relicensed as GPL.
+See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[LICENSES](LICENSES). Corresponding source is included with the release.
+
+The inherited `PUBLIC-SOURCE-MANIFEST.json` describes the initial source export.
+For this release, use the package's `SHA256-MANIFEST.json` and `BUILD.json`.
+
+For bug reports, include PCI/subsystem IDs, VBIOS and driver versions, build
+hashes, reproduction steps and a reviewed UEFI report. Remove personal paths,
+serial numbers, GPU UUIDs and credentials from attachments.

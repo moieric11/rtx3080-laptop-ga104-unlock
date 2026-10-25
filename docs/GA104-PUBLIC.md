@@ -1,5 +1,9 @@
 # RTX 3080 Laptop GA104 compute unlock — experimental Windows port
 
+For the complete USB release and current English instructions, start with
+the [README](../README.md) and [installation tutorial](INSTALL.md).
+The build notes below describe the original source-only export.
+
 This repository contains a hardware-specific UEFI port and Windows compute
 measurements for a Lenovo RTX 3080 Laptop. It builds on
 [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public)
@@ -56,11 +60,12 @@ Visual Studio and CUDA locations for your installation. The source export does
 not contain firmware blobs, VBIOS dumps, EFI executables or ready-to-boot USB
 images. `unlock/assets.json` records the expected firmware filenames, sizes
 and hashes. They must be supplied separately; a source checkout is not a
-bootable package. The local packaging scripts depend on development fixtures
-and are not a portable public installer.
+bootable package. The original local packaging scripts depend on development
+fixtures. The newer `tools/package_ga104_release.py` creates the documented
+complete release; see the README for that separate workflow.
 
 The original MSI desktop build remains a separate target. Its instructions
-and hardware assumptions are in the original README below the GA104 notice;
+and hardware assumptions are in the inherited `docs/USB-BOOT.md`;
 do not apply those desktop instructions as a validated laptop procedure.
 
 ## Check the current Windows performance profile

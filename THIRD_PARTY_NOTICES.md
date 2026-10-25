@@ -1,31 +1,56 @@
-# 외부 코드 고지
+# Third-party notices
 
-## GPU unlock 코어 및 UEFI 포트 — GPL-2.0-only
+## GPU unlock core and UEFI port - GPL-2.0-only
 
-- 원본: [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)
-- 고정 커밋: `0ebdb1c6308b6a2072be5bf04513472942541956`
-- 대상: `unlock/vendor/`의 `unlock_610`, `prep_610`, `layout_610`, `vbios_610`, `gfw_eval`, `diagnostic.h`.
-- 라이선스 원문: [LICENSE](LICENSE).
+- Upstream: [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)
+- Pinned commit: `0ebdb1c6308b6a2072be5bf04513472942541956`.
+- Files: `unlock/vendor/` implementations of `unlock_610`, `prep_610`,
+  `layout_610`, `vbios_610`, `gfw_eval`, and `diagnostic.h`.
+- License: [LICENSE](LICENSE).
 
-2026-10-18의 로컬 변경: MSI RTX 3080 대상 선택, UEFI의 checked I/O 및 실행·정리 상태 연결, FWSEC 진단. `tests/reference/unlock_610_v06.c`는 비교 검사에 사용하는 로컬 v0.6 스냅샷입니다. UEFI 포트와 host/mock 테스트도 GPL-2.0-only로 제공합니다. v0.10에서는 PCI I/O Attributes를 통해 Bus Master를 관리하고 프로토콜 상태와 실제 PCI Command를 함께 검사합니다.
+The original Windows UEFI port comes from
+[rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public).
+Original authors retain their copyright and attribution.
 
-2026-10-19의 공개용 도구·문서 정리: 로컬 USB 패키지 생성, 공개용 테스트 실행기, 상대 경로 기반 빌드 메타데이터. GPU 실행 조건과 transaction 순서는 유지했습니다.
+October 18, 2026 changes selected the MSI RTX 3080 target, connected checked
+UEFI I/O and execution/cleanup state, and added FWSEC diagnostics.
+`tests/reference/unlock_610_v06.c` is the local v0.6 snapshot used for comparisons.
+The UEFI port and host/mock tests are also GPL-2.0-only. Version 0.10 manages
+Bus Master through PCI I/O Attributes and checks protocol state against the
+actual PCI Command register.
 
-## EDK2 헤더 — BSD-2-Clause-Patent
+October 19, 2026 changes organized public tools and documentation: local USB
+packaging, public test runner, and relative-path build metadata, preserving the
+GPU execution conditions and transaction sequence.
 
-- 원본: [TianoCore EDK2](https://github.com/tianocore/edk2/tree/c1415771ac592ad8509351c46cd3cda4f38d7d52)
-- 고정 커밋: `c1415771ac592ad8509351c46cd3cda4f38d7d52`
-- 대상: `deps/edk2/MdePkg/Include/`.
-- 원문과 저작권 고지: [EDK2 라이선스](LICENSES/EDK2-BSD-2-Clause-Patent.txt) 및 각 파일의 헤더.
+The Lenovo GA104 laptop port adds explicit board checks, Discrete display
+handoff/reconnection, and corresponding offline tests. This release adds
+English documentation and complete USB packaging without changing the existing
+cold-selector unlock algorithm.
 
-앱은 헤더 선언을 사용하며 EDK2 라이브러리 바이너리를 링크하지 않습니다.
+## EDK2 headers - BSD-2-Clause-Patent
 
-## 상위 프로젝트의 관련 고지
+- Upstream: [TianoCore EDK2](https://github.com/tianocore/edk2/tree/c1415771ac592ad8509351c46cd3cda4f38d7d52)
+- Pinned commit: `c1415771ac592ad8509351c46cd3cda4f38d7d52`.
+- Files: `deps/edk2/MdePkg/Include/`.
+- License and notices: [EDK2 license](LICENSES/EDK2-BSD-2-Clause-Patent.txt)
+  and each file's header.
 
-상위 프로젝트에서 보존한 NVIDIA 소스 및 EFI 참조 고지를 함께 제공합니다.
+The application uses header declarations and does not link EDK2 library binaries.
 
-- [NVIDIA MIT 고지](LICENSES/NVIDIA-MIT.txt)
-- [CMP40HX MIT 고지](LICENSES/CMP40HX-MIT.txt)
+## NVIDIA firmware and inherited notices
+
+The complete USB release contains the five binary assets identified by exact
+filenames, sizes and SHA256 values in `unlock/assets.json` in the source tree.
+These were supplied from the local `gpu-unlock/firmware` asset set and are
+preserved byte-for-byte. Their presence in the package does not relicense them
+under GPL. Preserve the included NVIDIA license and notices with the binaries.
+
+The upstream source and EFI reference notices are retained:
+
+- [NVIDIA MIT notice](LICENSES/NVIDIA-MIT.txt)
+- [CMP40HX MIT notice](LICENSES/CMP40HX-MIT.txt)
 - [NVIDIA Driver License Agreement](LICENSES/NVIDIA-Driver.txt)
 
-소스와 USB 패키지를 복사할 때 해당 라이선스와 저작권 고지를 함께 유지하세요.
+Keep applicable licenses and copyright notices when copying the source or USB
+package. Corresponding GPL source is provided as `SOURCE.zip` in the release.
