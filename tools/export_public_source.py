@@ -18,6 +18,7 @@ EVIDENCE = (
     "lenovo-ga104-cold-selectors-success01", "windows-baseline-2026-10-23",
     "windows-after-2026-10-23", "windows-precision-stock-2026-10-24-164155",
     "windows-precision-unlocked-2026-10-24-165128",
+    "usb-boot-2026-10-27",
 )
 SECRET = re.compile(r"(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
                     r"hf_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)")

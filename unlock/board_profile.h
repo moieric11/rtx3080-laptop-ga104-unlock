@@ -8,7 +8,14 @@
 #define GU_BOARD_BAR0 0xd0000000ULL
 #define GU_BOARD_FB_MB 0x4000U
 #define GU_BOARD_COLD_SS0 0x61014100U
-#ifdef GU_COLD_SELECTOR_VARIANTS
+#if defined(GU_COLD_SELECTOR_MASK)
+/* SS0 contains eight override-enable bits and eight 3-bit selectors.
+ * Inactive selector values can vary between boots; they do not establish
+ * effective issue rates. Reject an inaccessible/zero sample and any active
+ * override. SS1 and every other cold-state check remain mandatory. */
+#define GU_BOARD_SS0_OVERRIDE_MASK 0x88888888U
+#define GU_BOARD_COLD_SS0_MATCH(value) ((value) != 0U && ((value) & GU_BOARD_SS0_OVERRIDE_MASK) == 0U)
+#elif defined(GU_COLD_SELECTOR_VARIANTS)
 /* Observed on this same Lenovo in RUN01, RUN03 and RUN04. All override
  * enable bits (0x88888888) remain clear. Do not accept zero/inaccessible
  * reads or arbitrary selectors; the other cold-state gates still apply. */

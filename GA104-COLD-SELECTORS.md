@@ -1,5 +1,39 @@
 # Correction du refus avant U
 
+## Version 2 : masque des overrides (27 octobre 2026)
+
+RUN14 avait SS0=0x61014101 ; RUN15 et RUN16 avaient SS0=0x60004100.
+Ces deux valeurs etaient refusees par la liste de trois captures v1 alors que
+les autres controles initiaux passaient. Les rapports sont conserves dans
+evidence/usb-boot-2026-10-27.
+
+La nouvelle variante GU_COLD_SELECTOR_MASK accepte un SS0 non nul si
+(SS0 & 0x88888888) == 0. Chaque chiffre hexadecimal contient un bit
+d'activation d'override et trois bits de selection ; la variation de ces
+selecteurs inactifs ne suffit pas a etablir un etat incompatible. La lecture
+0xffffffff et tout override actif restent refuses ; zero reste refuse comme
+etat non valide ici. SS1 doit toujours valoir 6. Les controles PCI, BAR, chip,
+VRAM, PLM, WPR2, GFW, PROM et firmware ainsi que la confirmation manuelle U
+restent obligatoires. La transaction d'unlock et le retour du GOP ne changent pas.
+
+Build : python tools/build_ga104_unlock.py --cold-selector-mask
+Sortie : build/ga104-cold-selector-mask/GA104-UNLOCK.EFI
+Verification : python tools/test_ga104_port.py
+
+Les tests executent le callback reel avec les cinq valeurs SS0 observees,
+verifient le refus de chacun des huit bits d'override, les lectures invalides
+et le maintien des autres controles avec le nouveau SS0 de RUN15.
+Le materiel et l'execution des firmwares sont simules dans ces tests : le
+prochain boot reste necessaire pour valider cette variante sur la machine.
+
+La variante v1 et le paquet publie v0.4.1 restent reproductibles avec
+--cold-selector-variants ; leurs empreintes historiques ne designent pas la v2.
+La mise a jour locale de la cle sauvegarde le boot v1 et son ACTIVE-BOOT.json
+dans EFI/TOOLS/COLD-SELECTORS-V1-BACKUP et ajoute RESTAURER-SELECTEURS-V1.cmd.
+Les rapports RUNxx et les firmwares ASSETS sont conserves.
+
+## Historique : version 1
+
 Le boot reussi RUN01 avait SS0=0x61014100 et SS1=6. Les boots refuses
 RUN03 et RUN04 ont respectivement SS0=0x60014100 et SS0=0x61004100,
 avec le meme chip, la meme taille de VRAM, PLM=0xffffff8f et WPR2_HI=0.

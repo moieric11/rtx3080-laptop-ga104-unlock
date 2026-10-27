@@ -156,7 +156,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   EFI_STATUS S=GuIoOpen(Image,St);DH_RESULT Result={0};const char *Stage="usb-log";
   if(EFI_ERROR(S))goto Finish;
   GuLogText("LENOVO GA104 DISCRETE experiment v0.4. Driver handoff tested; post-FLR recovery unverified.\n");
-#ifdef GU_COLD_SELECTOR_VARIANTS
+#ifdef GU_COLD_SELECTOR_MASK
+  GuLogText("COLD SELECTOR mask v2: SS0 nonzero, all override enables clear; SS1=6 and other cold gates unchanged. No ECC readout.\n");
+#elif defined(GU_COLD_SELECTOR_VARIANTS)
   GuLogText("COLD SELECTOR variant v1: three observed SS0 states accepted; other cold gates unchanged. No ECC readout.\n");
 #endif
 #ifdef GU_ECC_READOUT_VARIANT

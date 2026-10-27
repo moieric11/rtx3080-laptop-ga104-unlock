@@ -1,3 +1,23 @@
+# Development update: SS0 override mask (October 27, 2026)
+
+The optional `--cold-selector-mask` build replaces the three-value SS0 list
+with a nonzero value check and an eight-bit override-enable mask. This addresses
+the preflight refusals captured in RUN14 (`0x61014101`) and RUN15–16
+(`0x60004100`). SS1 must still equal 6; all other checks and manual confirmation
+remain mandatory. The transaction and display recovery code are unchanged.
+
+Offline callback tests cover the five observed SS0 values, rejection of each
+override-enable bit, invalid reads and the remaining cold-state checks.
+Hardware execution is simulated; the v2 variant still requires a hardware boot.
+See [selector details](../GA104-COLD-SELECTORS.md) and the
+[captured reports](../evidence/usb-boot-2026-10-27).
+
+`tools/update_ga104_selector_usb.ps1` migrates a known v1 FAT32 USB after
+validating its image and firmware hashes, and saves a restorable v1 backup.
+
+The published v0.4.1 package and its pinned EFI hash remain the v1 variant.
+Use `--cold-selector-variants` to reproduce that release.
+
 # v0.4.1-experimental
 
 First complete English-documented GA104 USB release for the existing Lenovo

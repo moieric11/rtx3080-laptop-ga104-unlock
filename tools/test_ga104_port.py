@@ -65,6 +65,11 @@ run(flags + ["-Wno-unused-parameter","-Wno-unused-function","-ffunction-sections
     ["-Wl,--gc-sections","-o","build/ga104-probe/test-callback-selectors"],"compile-callback-selectors")
 variant=run(["wsl","-e","./build/ga104-probe/test-callback-selectors",capture+"/PROM.BIN",assets,capture+"/REPORT.TXT"],"app-callback-selectors")
 print(variant.strip().splitlines()[-2])
+run(flags + ["-Wno-unused-parameter","-Wno-unused-function","-ffunction-sections","-fdata-sections","-fshort-wchar",
+             "-DPROBE_LENOVO_GA104","-DGU_COLD_SELECTOR_MASK"] + defines + ["-I","unlock/compat"] + includes + callback_sources +
+    ["-Wl,--gc-sections","-o","build/ga104-probe/test-callback-mask"],"compile-callback-mask")
+mask=run(["wsl","-e","./build/ga104-probe/test-callback-mask",capture+"/PROM.BIN",assets,capture+"/REPORT.TXT"],"app-callback-mask")
+print("SS0 override-mask v2: "+mask.strip().splitlines()[-2])
 # Ensure changing only the build flags cannot produce a live Discrete unlock.
 guard = subprocess.run(flags + ["-DGU_UEFI_PORT", "-DGU_PROFILE_LENOVO_GA104"] + includes +
                        ["-c", "unlock/port.c", "-o", "build/ga104-probe/blocked.obj"],
@@ -77,5 +82,7 @@ print("Live GA104 build requires the explicit experimental opt-in flag: PASS")
     "ga104_config_checks": 261, "msi_config_checks": 261,
     "simulated_transaction_scenarios": 20, "live_build_guard": "PASS",
     "actual_app_callback_simulated_scenarios":20,
+    "cold_selector_mask_v2": "PASS",
+    "cold_selector_mask_captures": 5, "cold_selector_mask_override_rejections": 8,
     "hardware_unlock_tested": False, "discrete_handoff_implemented": True,
 }, indent=2), encoding="utf-8")

@@ -1,0 +1,31 @@
+{
+  "variant": "cold-selectors-v1",
+  "sha256": "4b58554e18b0a2e987040cf3c006aa122bfd84ccd0f2dbee11cb225da7340000",
+  "hardware_tested": false,
+  "accepted_ss0": [
+    "0x61014100",
+    "0x60014100",
+    "0x61004100"
+  ],
+  "required_ss1": 6,
+  "ecc_readout": false,
+  "tests": "tools/test_ga104_port.py passed; hardware execution simulated",
+  "previous_boot_reports": [
+    "RUN03",
+    "RUN04"
+  ],
+  "verification": {
+    "path": "GA104-UNLOCK.EFI",
+    "bytes": 62464,
+    "sha256": "4b58554e18b0a2e987040cf3c006aa122bfd84ccd0f2dbee11cb225da7340000",
+    "machine": "AMD64",
+    "subsystem": 10,
+    "entry": "efi_main",
+    "entry_rva": 4096,
+    "imports": 0,
+    "iat": 0,
+    "delay_imports": 0,
+    "nx": true,
+    "dynamic_base": true
+  }
+}

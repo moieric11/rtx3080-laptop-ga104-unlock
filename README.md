@@ -75,7 +75,7 @@ listed in [unlock/assets.json](unlock/assets.json), provided under
 GSP image, bootstrap and descriptor used during the transaction. Their names
 include `ga102` as expected by the existing GA104 path; do not rename them.
 
-The release uses the `GU_COLD_SELECTOR_VARIANTS` build, accepting only three
+The published v0.4.1 release uses the `GU_COLD_SELECTOR_VARIANTS` build, accepting only three
 observed cold selector states on this Lenovo while retaining the other checks.
 Its EFI SHA256 is
 `4b58554e18b0a2e987040cf3c006aa122bfd84ccd0f2dbee11cb225da7340000`.
@@ -89,10 +89,17 @@ For the UEFI build, install Python 3.9+ on Windows and clang/lld in WSL. Run fro
 the repository root on a Windows drive accessible to WSL:
 
 ```powershell
-python .\tools\build_ga104_unlock.py --cold-selector-variants
+python .\tools\build_ga104_unlock.py --cold-selector-mask
 ```
 
-Output: `build/ga104-cold-selectors/GA104-UNLOCK.EFI`, with PE verification JSON.
+Output: `build/ga104-cold-selector-mask/GA104-UNLOCK.EFI`, with PE verification JSON.
+This development variant fixes the RUN14-16 preflight refusals: SS0 must be
+nonzero with all eight override-enable bits clear, rather than equal one of
+three captures. SS1 must still equal 6 and all other checks remain mandatory.
+Offline tests do not establish hardware validation of newly accepted states.
+See [the SS0 correction](GA104-COLD-SELECTORS.md).
+Use `--cold-selector-variants` to reproduce the published v0.4.1 binary;
+its existing release packager remains pinned to that binary.
 The builder invokes `wsl -e clang` and `wsl -e lld-link` and verifies an AMD64 EFI
 application without imports. The reproduced release used LLVM 21.1.8.
 
@@ -125,8 +132,9 @@ components retain their own notices; binary firmware is not relicensed as GPL.
 See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
 [LICENSES](LICENSES). Corresponding source is included with the release.
 
-The inherited `PUBLIC-SOURCE-MANIFEST.json` describes the initial source export.
-For this release, use the package's `SHA256-MANIFEST.json` and `BUILD.json`.
+`PUBLIC-SOURCE-MANIFEST.json` records hashes from the latest reviewed source
+export. For the published release, use the package's `SHA256-MANIFEST.json`
+and `BUILD.json`.
 
 For bug reports, include PCI/subsystem IDs, VBIOS and driver versions, build
 hashes, reproduction steps and a reviewed UEFI report. Remove personal paths,

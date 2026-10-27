@@ -37,36 +37,55 @@ int main(int argc,char **argv) {
     printf("GA104 actual unlock callback %s: safe=%u PASS\n",case_names[mode],safe);
     dispose_host_fixture();
   }
-  const UINT32 observed[]={0x61014100U,0x60014100U,0x61004100U};
-  for(UINTN i=0;i<3;i++) {
+  const UINT32 observed[]={0x61014100U,0x60014100U,0x61004100U,0x61014101U,0x60004100U};
+  for(UINTN i=0;i<sizeof(observed)/sizeof(observed[0]);i++) {
     setup(SUCCESS);Gu.image=(EFI_HANDLE)(UINTN)2;Gu.handle=(EFI_HANDLE)(UINTN)1;
     pci.GetBarAttributes=callback_bar;exclusive_checks=0;registers[SS0/4]=observed[i];
     DH_PLAN before={0};before.Target=Gu.handle;before.Image=Gu.image;memcpy(before.Config,config,sizeof(config));
     BOOLEAN safe=FALSE;EFI_STATUS s=Unlock(&pci,&before,&safe);
-#ifdef GU_COLD_SELECTOR_VARIANTS
+#ifdef GU_COLD_SELECTOR_MASK
     CHECK(!EFI_ERROR(s) && safe && Gu.started && Gu.flrs==1);
     CHECK(registers[SS0/4]==0x88888888 && registers[SS1/4]==8);
+#elif defined(GU_COLD_SELECTOR_VARIANTS)
+    if(i>=3)CHECK(s==EFI_NOT_READY && safe && !Gu.started && !Gu.flrs);
+    else {
+    CHECK(!EFI_ERROR(s) && safe && Gu.started && Gu.flrs==1);
+    CHECK(registers[SS0/4]==0x88888888 && registers[SS1/4]==8);
+    }
 #else
     if(i)CHECK(s==EFI_NOT_READY && safe && !Gu.started && !Gu.flrs);
     else CHECK(!EFI_ERROR(s) && safe && Gu.started);
 #endif
     dispose_host_fixture();
   }
-  const UINT32 rejected[]={0U,0xffffffffU,0xbadf0000U,0x88888888U,0x61014108U,0x61014101U};
+  const UINT32 rejected[]={0U,0xffffffffU,0xbadf0000U,0x88888888U,0x61014108U};
   for(UINTN i=0;i<sizeof(rejected)/sizeof(rejected[0]);i++) {
     setup(SUCCESS);registers[SS0/4]=rejected[i];
     CHECK(CheckCold()==EFI_NOT_READY && !Gu.started && !Gu.flrs);
     dispose_host_fixture();
   }
+#ifdef GU_COLD_SELECTOR_MASK
+  /* Every override-enable bit must block the real callback, not just the
+   * low nibble. Exercise the newer RUN15 baseline against each gate. */
+  for(UINTN field=0;field<8;field++) {
+    setup(SUCCESS);registers[SS0/4]=0x60004100U | (8U<<(field*4));
+    CHECK(CheckCold()==EFI_NOT_READY && !Gu.started && !Gu.flrs);
+    dispose_host_fixture();
+  }
+#endif
   /* A matching selector must never bypass the remaining cold gates. */
   const UINT32 offsets[]={0U,0x1183a4U,PLM,0x1fa828U,SS1,GU_GFW_BOOT_OFFSET};
   const UINT32 bad[]={0U,0U,0xffffffffU,0x10U,8U,0U};
   for(UINTN i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
-    setup(SUCCESS);registers[offsets[i]/4]=bad[i];
+    setup(SUCCESS);
+#ifdef GU_COLD_SELECTOR_MASK
+    registers[SS0/4]=0x60004100U;
+#endif
+    registers[offsets[i]/4]=bad[i];
     CHECK(CheckCold()==EFI_NOT_READY && !Gu.started && !Gu.flrs);
     dispose_host_fixture();
   }
-  puts("15 selector and cold-state regression scenarios passed.");
+  puts("Selector captures and remaining cold-state regression scenarios passed.");
   for(UINTN i=0;i<5;i++)free((VOID *)GuAssets[i].firmware.data);
   puts("20 actual GA104 app callback scenarios passed; hardware and firmware execution simulated.");
   return 0;
